@@ -1,150 +1,245 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement; // For switching scenes
-using Photon.Pun; // For multiplayer
+using Facebook.Unity;  // Make sure you've imported the Facebook SDK
+using System.Collections;
 
 public class LoginManager : MonoBehaviour
 {
-    // UI Elements
-    public Button guestLoginButton;
-    public Button facebookLoginButton;
-    public InputField playerNameInputField; // Input for player to type their name
-    public Text playerInfoText; // Displays Player Info (name only)
-    public Button startGameButton;
-    public Button logoutButton;
-    public GameObject nameInputPanel; // Pop-up for name input
-    public Text nameInputPanelText; // Instructions in the name input pop-up
-    public Text errorMessageText; // Displays the result of the name availability check
+    public GameObject loginPanel; // Panel for login UI
+    public GameObject playerInfoText; // Player info UI text
+    public Button startButton; // Start game button
+    public Button logoutButton; // Logout button
+    public GameObject guestLoginPanel; // Panel for guest login
+    public InputField playerNameInput; // Input field for player name
+    public Button guestLoginButton; // Button to login as guest
+    public Button confirmButton; // Button to confirm name input
+    public Button facebookLoginButton; // Facebook login button
+    public Text feedbackText; // Text to show feedback on name availability
 
-    private string playerName;
-    private string playerID;
+    private string playerName; // Player's name
+    private string playerID; // Random generated player ID
+    private bool isLoggedIn = false; // Login status
+    private bool isFacebookLogin = false; // Facebook login status
 
     void Start()
     {
-        // Initially hide player info and buttons
-        playerInfoText.gameObject.SetActive(false);
-        startGameButton.gameObject.SetActive(false);
-        logoutButton.gameObject.SetActive(false);
-
-        // Check if the player is already logged in (Guest login will be saved locally)
-        if (PlayerPrefs.HasKey("playerID"))
-        {
-            playerID = PlayerPrefs.GetString("playerID");
-            playerName = PlayerPrefs.GetString("playerName");
-            DisplayPlayerInfo();
-        }
-        else
-        {
-            // Show login buttons if no saved data
-            guestLoginButton.gameObject.SetActive(true);
-            facebookLoginButton.gameObject.SetActive(true);
-        }
+        InitializeUI();
 
         // Add listeners to buttons
-        guestLoginButton.onClick.AddListener(GuestLogin);
-        facebookLoginButton.onClick.AddListener(FacebookLogin);
-        startGameButton.onClick.AddListener(StartGame);
-        logoutButton.onClick.AddListener(Logout);
+        guestLoginButton.onClick.AddListener(OnGuestLogin);
+        confirmButton.onClick.AddListener(OnConfirmPlayerName);
+        startButton.onClick.AddListener(OnStartGame);
+        logoutButton.onClick.AddListener(OnLogout);
+        facebookLoginButton.onClick.AddListener(OnFacebookLogin);
+
+        // Check if the player has previously logged in
+        CheckLoginStatus();
     }
 
-    void GuestLogin()
+    // Initialize UI elements (hide/show based on login status)
+    void InitializeUI()
     {
-        // Generate a random 10-digit ID for guest login
-        playerID = GenerateRandomID();
-        PlayerPrefs.SetString("playerID", playerID); // Save the ID locally
-        // Show the name input panel to get the player's name
-        nameInputPanel.SetActive(true);
-        nameInputPanelText.text = "Enter your name (max 15 characters)";
-        errorMessageText.text = ""; // Clear any previous error messages
+        playerInfoText.SetActive(false);
+        logoutButton.gameObject.SetActive(false);
+        startButton.interactable = false; // Start button is disabled initially
+        guestLoginPanel.SetActive(false); // Hide the guest login panel initially
     }
 
-    void FacebookLogin()
+    // Check if the player was previously logged in (either guest or Facebook)
+    void CheckLoginStatus()
     {
-        // Placeholder for Facebook login integration
-        // You would use Facebook SDK here to get the player's Facebook data.
-        playerID = "FB_" + Random.Range(100000, 999999).ToString();  // Replace with Facebook user ID
-
-        // Show the name input panel for Facebook login to allow player to enter their name
-        nameInputPanel.SetActive(true);
-        nameInputPanelText.text = "Enter your name (max 15 characters)";
-        errorMessageText.text = ""; // Clear any previous error messages
-    }
-
-    void OnNameEntered()
-    {
-        // Get the player's typed name
-        string enteredName = playerNameInputField.text;
-
-        // Check if the name is valid (max 15 characters)
-        if (enteredName.Length > 15)
+        if (PlayerPrefs.HasKey("PlayerName") && PlayerPrefs.HasKey("PlayerID"))
         {
-            errorMessageText.text = "Name cannot exceed 15 characters";
-            return;
+            playerName = PlayerPrefs.GetString("PlayerName");
+            playerID = PlayerPrefs.GetString("PlayerID");
+            isLoggedIn = true;
+            DisplayPlayerInfo();
         }
-
-        // Check if the name is available (simulate a check, you can replace this with a real check)
-        if (IsNameTaken(enteredName))
+        else if (FB.IsInitialized && FB.IsLoggedIn)
         {
-            errorMessageText.text = "Player Name is not available";
-            return;
+            // If Facebook is already logged in, handle Facebook login
+            isFacebookLogin = true;
+            HandleFacebookLogin();
         }
         else
         {
-            errorMessageText.text = "Player Name is Available"; // Show that the name is available
-            playerName = enteredName;
-            PlayerPrefs.SetString("playerName", playerName);
-            nameInputPanel.SetActive(false); // Hide the name input panel
-            DisplayPlayerInfo();
+            // If no login data exists, show the guest login panel
+            guestLoginPanel.SetActive(true);
         }
     }
 
-    bool IsNameTaken(string name)
+    // Handle Guest Login Button Click
+    void OnGuestLogin()
     {
-        // Simulate checking if the name already exists (this can be replaced with a real server-side check)
-        // For now, we return true if the name is "TestName", for example.
-        return name == "TestName"; // Example condition for name availability check
+        guestLoginPanel.SetActive(true); // Show the name input panel
     }
 
+    // Handle Confirm Button (for input name validation and saving data)
+    void OnConfirmPlayerName()
+    {
+        playerName = playerNameInput.text;
+
+        if (IsValidName(playerName))
+        {
+            // Simulate checking if the name is available in the database
+            if (CheckNameAvailability(playerName))
+            {
+                // Generate a random player ID
+                playerID = GenerateRandomPlayerID();
+
+                // Save player name and ID locally using PlayerPrefs
+                SavePlayerData(playerName, playerID);
+
+                // Display player info
+                DisplayPlayerInfo();
+            }
+            else
+            {
+                feedbackText.text = "Player name is not available!";
+            }
+        }
+        else
+        {
+            feedbackText.text = "Name must be between 5 and 12 characters!";
+        }
+    }
+
+    // Check if the player name is valid
+    bool IsValidName(string name)
+    {
+        return name.Length >= 5 && name.Length <= 12 && !string.IsNullOrEmpty(name);
+    }
+
+    // Simulate checking if the name is available (usually check against a database or server)
+    bool CheckNameAvailability(string name)
+    {
+        // For the sake of this example, we will assume the name is always available
+        return true;
+    }
+
+    // Generate a random 10-digit player ID
+    string GenerateRandomPlayerID()
+    {
+        return Random.Range(1000000000, 9999999999).ToString();
+    }
+
+    // Save the player data (name and ID) locally using PlayerPrefs
+    void SavePlayerData(string name, string id)
+    {
+        PlayerPrefs.SetString("PlayerName", name);
+        PlayerPrefs.SetString("PlayerID", id);
+        PlayerPrefs.Save();
+    }
+
+    // Display player info (name and player ID)
     void DisplayPlayerInfo()
     {
-        // Show player info and buttons if logged in
-        playerInfoText.gameObject.SetActive(true);
-        playerInfoText.text = "Player Name: " + playerName; // Display name only
-        startGameButton.gameObject.SetActive(true);
+        playerInfoText.SetActive(true);
+        playerInfoText.GetComponent<Text>().text = "Player: " + playerName + " (ID: " + playerID + ")";
+        startButton.interactable = true;
         logoutButton.gameObject.SetActive(true);
-
-        guestLoginButton.gameObject.SetActive(false);
-        facebookLoginButton.gameObject.SetActive(false);
+        guestLoginPanel.SetActive(false); // Hide the guest login panel
     }
 
-    void StartGame()
+    // Handle Start Game button click (connect to Photon)
+    void OnStartGame()
     {
-        // Load multiplayer game scene (using Photon)
-        PhotonNetwork.ConnectUsingSettings(); // Connect to Photon network
-        SceneManager.LoadScene("GameScene"); // Replace with your game scene name
+        if (isLoggedIn)
+        {
+            // Here you would connect to Photon to start the game
+            // PhotonNetwork.ConnectUsingSettings(); // This is for Photon integration
+            Debug.Log("Starting game with player: " + playerName);
+        }
     }
 
-    void Logout()
+    // Handle Facebook Login Button Click
+    void OnFacebookLogin()
     {
-        // Clear saved data and reset UI
-        PlayerPrefs.DeleteKey("playerID");
-        PlayerPrefs.DeleteKey("playerName");
+        if (!FB.IsInitialized)
+        {
+            FB.Init(OnInitComplete, OnHideUnity);
+        }
+        else
+        {
+            FB.LogInWithReadPermissions(new string[] { "public_profile", "email" }, HandleFacebookLogin);
+        }
+    }
 
-        playerName = "";
-        playerID = "";
+    // Facebook Initialization Complete Callback
+    private void OnInitComplete()
+    {
+        if (FB.IsLoggedIn)
+        {
+            HandleFacebookLogin(FB.AccessToken);
+        }
+    }
 
-        // Hide player info and buttons
-        playerInfoText.gameObject.SetActive(false);
-        startGameButton.gameObject.SetActive(false);
+    // Facebook Hide Unity Callback (to manage Facebook's native UI)
+    private void OnHideUnity(bool isGameShown)
+    {
+        // Handle the state of the game when Unity is hidden (if needed)
+    }
+
+    // Handle the Facebook Login Response
+    private void HandleFacebookLogin(ILoginResult result = null)
+    {
+        if (result != null && result.Error == null)
+        {
+            // Successful login, now check if the player is old or new
+            string facebookID = FB.UserId;
+
+            // Simulate checking if the player exists in the database via Facebook ID
+            bool isOldPlayer = CheckIfFacebookPlayerExists(facebookID);
+
+            if (isOldPlayer)
+            {
+                // Retrieve player data from the server or locally (simulate)
+                playerName = GetPlayerNameFromServer(facebookID); // Example server retrieval
+                playerID = GetPlayerIDFromServer(facebookID); // Example server retrieval
+                SavePlayerData(playerName, playerID);
+                isLoggedIn = true;
+                DisplayPlayerInfo();
+            }
+            else
+            {
+                // New player, ask for name
+                guestLoginPanel.SetActive(true);
+                feedbackText.text = "Welcome new player! Please choose a name.";
+            }
+        }
+        else
+        {
+            Debug.LogError("Facebook login failed: " + result.Error);
+        }
+    }
+
+    // Simulate checking if the Facebook player exists (use server/database for real-world implementation)
+    bool CheckIfFacebookPlayerExists(string facebookID)
+    {
+        // For the sake of example, assume no player exists with this ID
+        return false; // If this is a new player, return false
+    }
+
+    // Simulate retrieving player name from a server/database
+    string GetPlayerNameFromServer(string facebookID)
+    {
+        return "NewFacebookPlayer"; // Simulating a name retrieval from a server
+    }
+
+    // Simulate retrieving player ID from a server/database
+    string GetPlayerIDFromServer(string facebookID)
+    {
+        return GenerateRandomPlayerID(); // Simulate retrieving a player ID
+    }
+
+    // Handle Logout button click
+    void OnLogout()
+    {
+        PlayerPrefs.DeleteKey("PlayerName");
+        PlayerPrefs.DeleteKey("PlayerID");
+        playerInfoText.SetActive(false);
+        startButton.interactable = false;
         logoutButton.gameObject.SetActive(false);
-
-        guestLoginButton.gameObject.SetActive(true);
-        facebookLoginButton.gameObject.SetActive(true);
-    }
-
-    string GenerateRandomID()
-    {
-        // Generate a 10-digit random ID
-        return Random.Range(1000000000, 9999999999).ToString();
+        guestLoginPanel.SetActive(true); // Show the guest login panel again
     }
 }

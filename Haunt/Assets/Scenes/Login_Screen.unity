@@ -1172,6 +1172,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 938991176}
+  - component: {fileID: 938991177}
   m_Layer: 0
   m_Name: LoginManager
   m_TagString: Untagged
@@ -1194,6 +1195,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &938991177
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 938991174}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4d1f63122f99314894d9212c271eeac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  loginPanel: {fileID: 984918615}
+  playerInfoText: {fileID: 898618060}
+  startButton: {fileID: 154329887}
+  logoutButton: {fileID: 2090393685}
+  loginPopup: {fileID: 828732193}
+  playerNameInput: {fileID: 1707326208}
+  feedbackText: {fileID: 543600677}
+  guestLoginButton: {fileID: 734406267}
+  facebookLoginButton: {fileID: 1375102530}
 --- !u!1 &984918615
 GameObject:
   m_ObjectHideFlags: 0
